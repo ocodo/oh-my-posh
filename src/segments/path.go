@@ -9,6 +9,7 @@ import (
 	"github.com/jandedobbeleer/oh-my-posh/src/properties"
 	"github.com/jandedobbeleer/oh-my-posh/src/regex"
 	"github.com/jandedobbeleer/oh-my-posh/src/runtime"
+	"github.com/jandedobbeleer/oh-my-posh/src/runtime/path"
 	"github.com/jandedobbeleer/oh-my-posh/src/shell"
 	"github.com/jandedobbeleer/oh-my-posh/src/template"
 )
@@ -126,7 +127,7 @@ func (pt *Path) Enabled() bool {
 	pt.setStyle()
 	pwd := pt.env.Pwd()
 
-	pt.Location = pt.env.TemplateCache().AbsolutePWD
+	pt.Location = pt.env.Flags().AbsolutePWD
 	if pt.env.GOOS() == runtime.WINDOWS {
 		pt.Location = strings.ReplaceAll(pt.Location, `\`, `/`)
 	}
@@ -568,21 +569,21 @@ func (pt *Path) setMappedLocations() {
 			Context:  pt,
 		}
 
-		path, err := tmpl.Render()
+		location, err := tmpl.Render()
 		if err != nil {
 			pt.env.Error(err)
 		}
 
-		if len(path) == 0 {
+		if len(location) == 0 {
 			continue
 		}
 
 		// When two templates resolve to the same key, the values are compared in ascending order and the latter is taken.
-		if v, exist := mappedLocations[pt.normalize(path)]; exist && value <= v {
+		if v, exist := mappedLocations[pt.normalize(location)]; exist && value <= v {
 			continue
 		}
 
-		mappedLocations[pt.normalize(path)] = value
+		mappedLocations[pt.normalize(location)] = value
 	}
 
 	pt.mappedLocations = mappedLocations
@@ -660,9 +661,9 @@ func (pt *Path) parsePath(inputPath string) (string, string) {
 	}
 
 	if pt.cygPath {
-		path, err := pt.env.RunCommand("cygpath", "-u", inputPath)
-		if len(path) != 0 {
-			inputPath = path
+		cygPath, err := pt.env.RunCommand("cygpath", "-u", inputPath)
+		if len(cygPath) != 0 {
+			inputPath = cygPath
 			pt.pathSeparator = "/"
 		}
 
@@ -697,25 +698,26 @@ func (pt *Path) parsePath(inputPath string) (string, string) {
 	return root, relative
 }
 
-func (pt *Path) isRootFS(path string) bool {
-	return len(path) == 1 && runtime.IsPathSeparator(pt.env, path[0])
+func (pt *Path) isRootFS(inputPath string) bool {
+	return len(inputPath) == 1 && path.IsSeparator(inputPath[0])
 }
 
-func (pt *Path) endWithSeparator(path string) bool {
-	if len(path) == 0 {
+func (pt *Path) endWithSeparator(inputPath string) bool {
+	if len(inputPath) == 0 {
 		return false
 	}
-	return runtime.IsPathSeparator(pt.env, path[len(path)-1])
+
+	return path.IsSeparator(inputPath[len(inputPath)-1])
 }
 
 func (pt *Path) normalize(inputPath string) string {
 	normalized := inputPath
 
-	if strings.HasPrefix(normalized, "~") && (len(normalized) == 1 || runtime.IsPathSeparator(pt.env, normalized[1])) {
+	if strings.HasPrefix(normalized, "~") && (len(normalized) == 1 || path.IsSeparator(normalized[1])) {
 		normalized = pt.env.Home() + normalized[1:]
 	}
 
-	normalized = runtime.CleanPath(pt.env, normalized)
+	normalized = path.Clean(normalized)
 
 	if pt.env.GOOS() == runtime.WINDOWS || pt.env.GOOS() == runtime.DARWIN {
 		normalized = strings.ToLower(normalized)
@@ -827,9 +829,9 @@ func (pt *Path) makeFolderFormatMap() map[string]string {
 	if gitDirFormat := pt.props.GetString(GitDirFormat, ""); len(gitDirFormat) != 0 {
 		dir, err := pt.env.HasParentFilePath(".git", false)
 		if err == nil && dir.IsDir {
-			// Make it consistent with the modified path.
-			path := pt.join(pt.replaceMappedLocations(dir.ParentFolder))
-			folderFormatMap[path] = gitDirFormat
+			// Make it consistent with the modified parent.
+			parent := pt.join(pt.replaceMappedLocations(dir.ParentFolder))
+			folderFormatMap[parent] = gitDirFormat
 		}
 	}
 

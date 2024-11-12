@@ -26,25 +26,12 @@ const (
 )
 
 func renderTemplateNoTrimSpace(env *mock.Environment, segmentTemplate string, context any) string {
-	found := false
-	for _, call := range env.Mock.ExpectedCalls {
-		if call.Method == "TemplateCache" {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		env.On("TemplateCache").Return(&cache.Template{})
-	}
-
-	env.On("Error", testify_.Anything)
-	env.On("Debug", testify_.Anything)
-	env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
-	env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
 	env.On("Shell").Return("foo")
 
-	template.Init(env)
+	if template.Cache == nil {
+		template.Cache = &cache.Template{}
+	}
+	template.Init(env, nil)
 
 	tmpl := &template.Text{
 		Template: segmentTemplate,
@@ -987,12 +974,10 @@ func TestFullPathCustomMappedLocations(t *testing.T) {
 
 		env.On("Flags").Return(args)
 		env.On("Shell").Return(shell.GENERIC)
-		env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
-		env.On("TemplateCache").Return(&cache.Template{})
 		env.On("Getenv", "HOME").Return(homeDir)
-		env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
 
-		template.Init(env)
+		template.Cache = new(cache.Template)
+		template.Init(env, nil)
 
 		props := properties.Map{
 			properties.Style:       Full,
@@ -1023,10 +1008,9 @@ func TestFolderPathCustomMappedLocations(t *testing.T) {
 	}
 	env.On("Flags").Return(args)
 	env.On("Shell").Return(shell.GENERIC)
-	env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
-	env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
 
-	template.Init(env)
+	template.Cache = new(cache.Template)
+	template.Init(env, nil)
 
 	props := properties.Map{
 		properties.Style: FolderType,
@@ -1422,10 +1406,9 @@ func TestGetPwd(t *testing.T) {
 		}
 		env.On("Flags").Return(args)
 		env.On("Shell").Return(shell.PWSH)
-		env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
-		env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
 
-		template.Init(env)
+		template.Cache = new(cache.Template)
+		template.Init(env, nil)
 
 		props := properties.Map{
 			MappedLocationsEnabled: tc.MappedLocationsEnabled,
@@ -1459,14 +1442,12 @@ func TestGetFolderSeparator(t *testing.T) {
 	for _, tc := range cases {
 		env := new(mock.Environment)
 		env.On("Error", testify_.Anything)
-		env.On("Debug", testify_.Anything)
-		env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
 		env.On("Shell").Return(shell.GENERIC)
-		env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
-		env.On("TemplateCache").Return(&cache.Template{
+
+		template.Cache = &cache.Template{
 			Shell: "bash",
-		})
-		template.Init(env)
+		}
+		template.Init(env, nil)
 
 		props := properties.Map{}
 
@@ -1651,10 +1632,9 @@ func TestReplaceMappedLocations(t *testing.T) {
 		env.On("Shell").Return(shell.FISH)
 		env.On("GOOS").Return(runtime.DARWIN)
 		env.On("Home").Return("/a/b/k")
-		env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
-		env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
 
-		template.Init(env)
+		template.Cache = new(cache.Template)
+		template.Init(env, nil)
 
 		props := properties.Map{
 			MappedLocationsEnabled: tc.MappedLocationsEnabled,
@@ -1777,14 +1757,12 @@ func TestGetMaxWidth(t *testing.T) {
 
 	for _, tc := range cases {
 		env := new(mock.Environment)
-		env.On("DebugF", testify_.Anything, testify_.Anything).Return(nil)
 		env.On("Error", testify_.Anything).Return(nil)
-		env.On("TemplateCache").Return(&cache.Template{})
 		env.On("Getenv", "MAX_WIDTH").Return("120")
 		env.On("Shell").Return(shell.BASH)
-		env.On("Trace", testify_.Anything, testify_.Anything).Return(nil)
 
-		template.Init(env)
+		template.Cache = new(cache.Template)
+		template.Init(env, nil)
 
 		props := properties.Map{
 			MaxWidth: tc.MaxWidth,
