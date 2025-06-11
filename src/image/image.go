@@ -25,7 +25,6 @@ package image
 import (
 	"archive/zip"
 	"bytes"
-	"errors"
 	"fmt"
 	"image"
 	"io"
@@ -236,29 +235,30 @@ func (ir *Renderer) loadFonts() error {
 	}
 
 	if useEnvFonts {
-		// Quick font parser to ensure valid font with name containing Nerd Font / NerdFont
+		// Quick font parser to ensure
+		// - fileName must be a valid pathname
+		// - name contains NerdFont
+		// - valid font according to opentype
 		parseFont := func(fileName string) (font.Face, error) {
-			// Filename must include Nerd\s?Font
-			nerdNameMatch := regex.FindNamedRegexMatch(`Nerd\s?Font`, fileName)
-			if len(nerdNameMatch) == 0 {
-				return nil, errors.New("font filename should contain NerdFont || Nerd Font")
+			is_nerdName := strings.Contains(fileName, "NerdFont")
+			if !is_nerdName {
+				return nil, fmt.Errorf("filename [%s] should contain NerdFont", fileName)
 			}
 
-			filePath := filepath.Join(cache.Path(), fileName)
+			data, err := stdOS.ReadFile(fileName)
 
-			data, err := stdOS.ReadFile(filePath)
 			if err != nil {
-				return nil, errors.New("file not found or could not be read")
+				return nil, fmt.Errorf("[%s] not found or could not be read: %s", fileName, err)
 			}
 
 			font, err := opentype.Parse(data)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("font [%s] could not be parsed", fileName)
 			}
 
 			fontFace, err := opentype.NewFace(font, fontFaceOptions)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("[%s] font face could not be opened", fileName)
 			}
 			return fontFace, nil
 		}
